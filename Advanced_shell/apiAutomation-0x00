@@ -2,13 +2,16 @@
 # Makes a request to 'https://pokeapi.co/api/v2/pokemon/25' and
 # retrieves data for a specific Pokemon Pikachu
 
-FILE='data.json'
-URL='https://pokeapi.co/api/v2/pokemon/25'
+URL="https://pokeapi.co/api/v2/pokemon/25"
+SUCCESS_FILE=$"data.json"
+ERROR_FILE=$"errors.txt"
 
-if [ -f $FILE ]; then
-    rm $FILE
+response=$(curl -s -w "%{http_code}" $URL)
+http_code="${response: -3}"
+body="${response%???}"
+
+if [ "$http_code" -eq 200 ]; then
+    echo "$body" > "$SUCCESS_FILE"
 else
-    touch $FILE
+    echo "$body" > "$ERROR_FILE"
 fi
-
-curl $URL > $FILE
