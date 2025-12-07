@@ -83,5 +83,6 @@ for pokemon in "${POKE_LIST[@]}"; do
 done
 
 wait
+# No need for kill
 
 echo "All Pokemon data fetching jobs completed successfully."
