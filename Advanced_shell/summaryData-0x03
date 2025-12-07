@@ -1,0 +1,49 @@
+#!/usr/bin/bash
+# Create a report that summarizes data for multiple Pokemon.
+#
+# Instructions:
+# - Write a shell script that reads all the JSON files generated in Task 2 and
+#   extracts the name, height, and weight of each Pokemon.
+#
+# - Generate a CSV file containing the Pokemon's name, height, and weight.
+#
+# - Use awk to calculate the average height and weight of all Pokemon in the report.
+
+DATA_DIR="pokemon_data"
+OUTPUT_FILE="pokemon_report.csv"
+
+if [ ! -d "$DATA_DIR" ]; then
+    echo "Error: Directory '$DATA_DIR' not found!"
+    exit 1
+fi
+
+echo "Name,Height (m),Weight (kg)" > "$OUTPUT_FILE"
+
+for file in "$DATA_DIR"/*.json; do
+    name=$(jq -r '.name' "$file")
+    height=$(jq -r '.height' "$file")
+    weight=$(jq -r '.weight' "$file")
+
+    height_m=$(awk "BEGIN { printf \"%.1f\", $height / 10 }")
+    weight_kg=$(awk "BEGIN { printf \"%.1f\", $weight / 10 }")
+
+    echo "${name^},${height_m},${weight_kg}" >> "$OUTPUT_FILE"
+done
+
+echo "CSV Report generated as: ${OUTPUT_FILE}"
+echo
+
+cat "$OUTPUT_FILE"
+echo
+
+awk -F',' '
+    NR > 1 {
+        height_sum += $2;
+        weight_um += $3;
+        count++
+    }
+    END {
+        printf "Average Height: %.2f m\n", height_sum / count;
+        printf "Average Weight: %.2f kg\n", weight_sum / count;
+    }
+' "$OUTPUT_FILE"
