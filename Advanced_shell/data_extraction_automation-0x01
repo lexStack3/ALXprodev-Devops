@@ -4,24 +4,14 @@
 
 set -euo pipefail
 
-jq '{"name": .name, "type": .types[].type.name, "height": .height, "weight": .weight}' data.json |
-    sed 's/[{}\,]/ /g; s/"//g; s/://g' |
-    awk '\
-    {
-        for (i = 1; i <= NF; i++) {
-            if ($i == "name") {
-                name = toupper(substr($(i+1), 1, 1)) tolower(substr($(i+1), 2))
-            }
-            if ($i == "type") {
-                type = toupper(substr($(i+1), 1, 1)) tolower(substr($(i+1), 2))
-            }
-            if ($i == "height")
-                height = $(i+1)
-            if ($i == "weight")
-                weight = $(i+1)
-        }
-    }
-    END {
-        weight = weight / 10
-        printf "%s is of type %s, weighs %skg, and is 0.%sm tall.\n", name, type, weight, height
-    }'
+DATA_FILE="data.json"
+
+name=$(jq -r .name $DATA_FILE | sed 's/.*/\u&/')
+type=$(jq -r .types[].type.name $DATA_FILE | sed 's/.*/\u&/')
+weight=$(jq -r .weight $DATA_FILE)
+height=$(jq -r .height $DATA_FILE)
+
+formatted_weight=$(echo $weight | awk '{printf "%d", $1}')
+formatted_height=$(echo $height | awk '{printf "%.1f", $1/10}')
+
+echo "$name is of type $type, weighs ${formatted_weight}kg, and is ${formatted_height}m tall."
