@@ -1,0 +1,87 @@
+#!/usr/bin/bash
+# Speed up data retrival using parallel processing.
+#
+# Instructions:
+# - Write a script that fetches data for these Pokemon[Bulbasaur, Ivysaur,
+#   Venusuar, Charmander, Charmelon] in parallel by leveraging background processes
+#   and process management tools.
+#
+# - Ensure that the script handles background processes properly and waits for all
+#   processes to complete before moving to the next step.
+
+DIR="pokemon_data"
+API_URL="https://pokeapi.co/api/v2/pokemon"
+POKEMONS="bulbasaur, ivysaur, venusaur, charmander, charmeleon"
+ERROR_FILE="$DIR/errors.txt"
+max_attempts=3
+retry_delay=1
+
+mkdir -p "$DIR"
+touch "$ERROR_FILE"
+
+fetch_pokemon() {
+    local pokemon="$1"
+    local file_path="$2"
+    local pokemon_clean
+    pokemon_clean=$(echo "$pokemon" | tr '[:upper:]' '[:lower:]' | xargs)
+
+    local attempt=1
+    local success=0
+    local last_http=0
+    local last_body=""
+
+    while [ $attempt -le $max_attempts ]; do
+        response=$(curl -s -w "%{http_code}" "$API_URL/$pokemon_clean")
+        curl_exit=$?
+        if [ $curl_exit -ne 0 ]; then
+            echo "❌ Attempt $attempt: Network error for $pokemon_clean (curl exit $curl_exit)"
+            last_http=0
+            last_body="(network error)"
+        else
+            last_http="${response: -3}"
+            last_body="${response%???}"
+        fi
+
+        if [ "$curl_exit" -eq 0 ] && [ "$last_http" -eq 200 ]; then
+            echo "$last_body" > "$file_path"
+            echo "Saved data to $file_path ✅"
+            success=1
+            break
+        fi
+
+        if [ "$curl_exit" -eq 0 ] && [ "$last_http" -eq 404 ]; then
+            echo "❌ $pokemon_clean not found (HTTP 404). Skipping."
+            echo "NOT FOUND: $pokemon_clean" >> "$ERROR_FILE"
+            success=0
+            break
+        fi
+
+        echo "❌ Attempt $attempt failed for $pokemon_clean (HTTP ${last_http:-N/A}). Retrying in ${retry_delay}s..."
+        attemp=$(( attempt + 1 ))
+        sleep $retry_delay
+    done
+
+    if [ $success -ne 1 ]  && [ $last_http -ne 404 ]; then
+        echo "FAILED: $pokemon_clean after $max_attempts attempts"
+        {
+            echo "FAILED: $pokemon_clean after $max_attempts (last HTTP: ${last_http:-N/A})"
+            echo "$last_body"
+            echo "-------------------------------"
+        } >> "$ERROR_FILE"
+    fi
+}
+
+IFS=',' read -ra POKE_LIST <<< "$POKEMONS"
+
+for pokemon in "${POKE_LIST[@]}"; do
+    pokemon=$(echo "$pokemon" | xargs)
+    file_name=$(echo "$pokemon" | tr '[:upper:]' '[:lower:]').json
+    file_path="$DIR/$file_name"
+
+    fetch_pokemon "$pokemon" "$file_path" &
+
+done
+
+wait
+
+echo "All Pokemon data fetching jobs completed successfully."
